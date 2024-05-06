@@ -73,6 +73,47 @@ async function deleteForm1(vehicleLicensePlate) {
   }
 }
 
+async function callAPIChangeForm1(oldPhoneNumber, newData, type) {
+  let name = null;
+  let phoneNumber = null;
+  let email = null;
+  let address = null;
+
+  let dataObject = {
+    name: name,
+    phoneNumber: phoneNumber,
+    email: email,
+    address: address,
+    oldPhoneNumber: oldPhoneNumber
+  };
+
+  if (type === "email") {
+    dataObject.email = newData;
+  }
+  if (type === "phone") {
+    dataObject.phoneNumber = newData;
+  }
+  if (type === "name") {
+    dataObject.name = newData;
+  }
+  if (type === "address") {
+    dataObject.address = newData;
+  }
+
+  $.ajax({
+    url: '/change-form1',
+    type: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify(dataObject),
+    success: function(response) {
+      // alert(response.status);
+    },
+    error: function(xhr, status, error) {
+      alert(error)
+    }
+  });
+}
+
 async function fetchData() {
   try {
     test = await $.ajax({
@@ -179,7 +220,7 @@ async function fetchData() {
         confirmDeletion.call(this);
       });
 
-      $('.cancel-button[data-vehicle-license-number]').off('click').on('click', cancelDeletion);
+      // $('.cancel-button[data-vehicle-license-number]').off('click').on('click', cancelDeletion);
       $('[id^="data-"]').off('click').on('click', function(){
         editDataForm1.call(this);
       })
@@ -202,10 +243,6 @@ async function fetchData() {
                      <span style="cursor: pointer; color:green"  class="material-symbols-outlined details-button" data-id"="${data.ID}" data-vehicle-license-number="${data.Cars[0].licenseNumber}" data-toggle="tooltip" title="click for details">info</span>
                      <span style="cursor: pointer; color:red" class="material-symbols-outlined delete-button" data-id="${data.ID}" data-vehicle-license-number="${data.Cars[0].licenseNumber}" data-toggle="tooltip" title="click for delete">delete</span>
                  </div>
-                 <div class="row col-sm-2 hidden" id = "cancel-confirm-btn-${data.Cars[0].licenseNumber}">
-                     <button class="btn btn-sm btn-danger confirm-button" data-id="${data.ID}" data-vehicle-license-number="${data.Cars[0].licenseNumber}">Confirm</button>
-                     <button class="btn btn-sm btn-success cancel-button" data-id="${data.ID}" data-vehicle-license-number="${data.Cars[0].licenseNumber}">Cancel</button>
-                 </div>
               </td>`;
 
       $('#myTable').append(row)
@@ -221,11 +258,7 @@ async function fetchData() {
                     <div class = "row col-sm-2 show" id = "change-del-btn-${data.Cars[i].licenseNumber}">
                         <span style="cursor: pointer; color:green"  class="material-symbols-outlined details-button" data-id"="${data.ID}" data-vehicle-license-number="${data.Cars[i].licenseNumber}" data-toggle="tooltip" title="click for details">info</span>
                         <span style="cursor: pointer; color:red" class="material-symbols-outlined delete-button" data-id="${data.ID}" data-vehicle-license-number="${data.Cars[i].licenseNumber}" data-toggle="tooltip" title="click for delete">delete</span>
-                      </div>
-                    <div class="row col-sm-2 hidden" id = "cancel-confirm-btn-${data.Cars[i].licenseNumber}">
-                        <button class="btn btn-sm btn-danger confirm-button" data-id="${data.ID}" data-vehicle-license-number="${data.Cars[i].licenseNumber}">Confirm</button>
-                        <button class="btn btn-sm btn-success cancel-button" data-id="${data.ID}" data-vehicle-license-number="${data.Cars[i].licenseNumber}">Cancel</button>
-                    </div>
+                      </div> 
                 </td>
             </tr>`
         $('#myTable').append(subRow)
@@ -246,12 +279,31 @@ async function fetchData() {
     buildTable(test);
 
     // ----------------- edit form1 function
+    function getID(id){
+      var idArray = id.split("-");
+      return idArray[idArray.length - 1];
+    }
+    function getPhoneNumber(dataID) {
+      var phoneNumber = "";
+
+      $('table tr').each(function() {
+        var phoneCell = $(this).find(`td[id^="data-phone-${dataID}"]`);
+        if (phoneCell.length > 0) {
+          phoneNumber = phoneCell.text();
+          return false;
+        }
+      });
+      return phoneNumber;
+    }
     function editDataForm1(){
       var dataID =  $(this).attr('id')
+      var rowID = getID(dataID)
+      console.log(rowID)
+      var oldPhone = getPhoneNumber(rowID)
+      console.log(oldPhone)
       if (dataID.includes('data-order-')){
         return ;
       }
-      console.log(dataID)
       var currentData = $(this).text()
       var inputElement = $('<input type="text" class="form-control">').val(currentData)
       $(this).empty().append(inputElement);
@@ -273,7 +325,28 @@ async function fetchData() {
             cancelButtonText: 'Cancel'
           }).then((result) => {
             if (result.isConfirmed) {
-              Swal.fire('Success', 'Changes saved', 'success');
+              // console.log("old Phone, new Data: ", oldPhone, newData)
+              let type = null;
+              if (dataID.toString().includes("email")) {
+                type = "email";
+              }
+              if (dataID.toString().includes("name")) {
+                type = "name";
+              }
+              if (dataID.toString().includes("phone")) {
+                type = "phone";
+              }
+              if (dataID.toString().includes("address")) {
+                type = "address";
+              }
+              callAPIChangeForm1(oldPhone, newData, type);
+
+              setTimeout(function () {
+                Swal.fire('Success', 'Changes saved', 'success');
+              }, 3000);
+
+              window.location.reload();
+
             } else {
               // console.log("after", beforeInput)
               originalElement.text(beforeInput)
@@ -338,86 +411,90 @@ async function fetchData() {
     }
 
     closeForm('#formAdd', '#closeForm_1', '#dataTable', 'click');
+
+
     // Delete data fucntion
     // ---------------- Delete data fucntion
     function deleteData() {
       var vehicleID = $(this).attr('data-vehicle-license-number');
 
-      // Kiểm tra xem vehicleID có giá trị không
       if (vehicleID) {
-        console.log("deldata called");
-        var change_del_Btn = $(`#change-del-btn-${vehicleID.replace(/\./g, "\\.")}`);
-        var cancel_confirm_Btn = $(`#cancel-confirm-btn-${vehicleID.replace(/\./g, "\\.")}`);
-
-        change_del_Btn.addClass('hidden');
-        change_del_Btn.removeClass('show');
-        cancel_confirm_Btn.addClass('show');
-        cancel_confirm_Btn.removeClass('hidden');
+        Swal.fire({
+          title: 'Delete Confirmation',
+          text: 'Are you sure to delete this data?',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Confirm',
+          cancelButtonText: 'Cancel'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            if (confirmDeletion(vehicleID))
+              Swal.fire('Success', 'Deleted ', 'success');
+            setTimeout(function () {
+              console.log("Waiting 5 seconds")
+              window.location.reload();
+            }, 3000);
+          } else
+            Swal.fire('Cancel', 'Cancel Deletion', 'info')
+        });
       } else {
         console.log("vehicleID is undefined or empty");
       }
     }
 
-
-    function cancelDeletion() {
-      var vehicleID = $(this).data('vehicle-license-number')
-      var change_del_Btn = $(`#change-del-btn-${vehicleID.replace(/\./g, "\\.")}`);
-      var cancel_confirm_Btn = $(`#cancel-confirm-btn-${vehicleID.replace(/\./g, "\\.")}`);
-
-      change_del_Btn.addClass('show')
-      change_del_Btn.removeClass('hidden')
-      cancel_confirm_Btn.addClass('hidden')
-      cancel_confirm_Btn.removeClass('show')
-    };
-
-    // 1/5
-    async function confirmDeletion(dataID) {
-      var vehicleID = $(this).data('vehicle-license-number')
+    async function confirmDeletion(vehicleID) {
+      console.log(vehicleID)
+      // var vehicleID = $(this).data('vehicle-license-number')
       let response = await deleteForm1(vehicleID);
-      if (response.success) {
-        popupDialog("Success", "Data deleted")
-        setTimeout(function () {
-          console.log("Waiting 5 seconds")
-          window.location.reload();
-        }, 3000);
-      }
-      else {
-        alert("Error !!!");
-      }
-    };
-
-
-    // Table 2
-    //add row table 2
-    function addRowDetails(data) {
-      let numVehicle=0;
-      data.Dates.forEach(function(date) {
-        numVehicle += date.Details.length
-      });
-      console.log("numVe", numVehicle)
-      data.Dates.forEach(function (dateData, dateIndex) {
-        var isFirstDateRow = (dateIndex === 0);
-        dateData.Details.forEach(function (detail, detailIndex) {
-          var newRow = $('<tr>');
-          if (isFirstDateRow && detailIndex === 0) {
-            $('<td>').attr('rowspan', numVehicle).text(data.licenseNumber).appendTo(newRow);
-          }
-          if (detailIndex === 0) {
-            $('<td>').attr('rowspan', data.Dates.length).text(dateData.Date).appendTo(newRow);
-          }
-          $('<td>').text(detail.notes).appendTo(newRow);
-          $('<td>').text(detail.equip).appendTo(newRow);
-          $('<td>').text(detail.quantity).appendTo(newRow);
-          $('<td>').text(detail.price).appendTo(newRow);
-          $('<td>').text(detail.charge).appendTo(newRow);
-          $('<td>').text(detail.total).appendTo(newRow);
-
-          $('#detailsTable').append(newRow);
-        });
-      });
+      // return !!response.success;
+      if (response.success)
+          return true;
+      else
+        return false;
     }
 
+    // ------------ FORM 2 ---------------
 
+    // Right Table
+    function addRowDetails(data) {
+      let numVehicle = 0;
+
+      // Tính tổng số lượng chi tiết
+      data.Dates.forEach(function(date) {
+        numVehicle += date.Details.length;
+      });
+
+      data.Dates.forEach(function(dateData, dateIndex) {
+        dateData.Details.forEach(function(detail, detailIndex) {
+          var orderNumber = detail.OrderNumber;
+          var row = '';
+          if (detailIndex === 0) {
+            row += `<tr>`;
+            if (dateIndex === 0)
+              row += `<td id="data-order-num-${data.licenseNumber}" rowspan="${numVehicle}">${data.licenseNumber}</td>`;
+            row += `<td id="data-order-date-${data.Dates.length}" rowspan="${data.Dates.length}">${dateData.Date}</td>`;
+          }
+          row += `<td data-order-id="${orderNumber}" id="data-order-note-${orderNumber}" data-toggle="tooltip" title="click for edit">${detail.notes}</td>
+                        <td data-order-id="${orderNumber}" id="data-order-equip-${orderNumber}" data-toggle="tooltip" title="click for edit">${detail.equip}</td>
+                        <td data-order-id="${orderNumber}" id="data-order-quantity-${orderNumber}" data-toggle="tooltip" title="click for edit">${detail.quantity}</td>
+                        <td data-order-id="${orderNumber}" id="data-order-price-${orderNumber}" data-toggle="tooltip" title="click for edit">${detail.price}</td>
+                        <td data-order-id="${orderNumber}" id="data-order-charge-${orderNumber}" data-toggle="tooltip" title="click for edit">${detail.charge}</td>
+                        <td data-order-id="${orderNumber}" id="data-order-total-${orderNumber}" data-toggle="tooltip" title="click for edit">${detail.total}</td>
+                        <td>
+                            <span style="cursor: pointer; color:red" class="material-symbols-outlined delete-button" data-order="${detail.OrderNumber}" data-vehicle-license-number="${data.licenseNumber}" data-toggle="tooltip" title="click for delete">delete</span>
+                        </td>
+                    </tr>`;
+
+          $('#detailsTable').append(row);
+          $('.delete-button[data-order-]').off('click').on('click', function(){
+            deleteDetails.call(this)
+          })
+          $('[id^="data-order-"]').off('click').on('click', function(){
+            editDataDetails.call(this);
+          })
+        })
+      });
+    }
     function detailsData() {
       $(`#detailsTable`).empty()
       var vehicleID = $(this).data('vehicle-license-number');
@@ -428,6 +505,7 @@ async function fetchData() {
         "Dates": [{
           'Date': '01/05/2024',
           'Details': [{
+            'OrderNumber':'1',
             'notes': 'aaaa',
             'equip': 'wheels',
             'quantity': '2',
@@ -436,6 +514,7 @@ async function fetchData() {
             'total': '24'
           },
             {
+              'OrderNumber':'2',
               'notes': 'bbbbb',
               'equip': 'big wheels',
               'quantity': '2',
@@ -448,6 +527,7 @@ async function fetchData() {
           {
             'Date': '1/1/2005',
             'Details': [{
+              'OrderNumber':'3',
               'notes': 'bbbbb',
               'equip': 'small wheels',
               'quantity': '2',
@@ -456,6 +536,7 @@ async function fetchData() {
               'total': '24'
             },
               {
+                'OrderNumber':'4',
                 'notes': 'bbbbb',
                 'equip': 'big glass',
                 'quantity': '2',
@@ -476,26 +557,84 @@ async function fetchData() {
       });
 
       addRowDetails(firstData);
+    }
+    function deleteDetails(){
+      var orderID = $(this).data('order-id')
+      console.log(orderID)
+      if (orderID){
+        Swal.fire({
+          title: 'Delete Confirmation',
+          text: 'Are you sure to delete this data?',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Confirm',
+          cancelButtonText: 'Cancel'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            if (confirmDeletionDetails(vehicleID))
+              Swal.fire('Success', 'Deleted ', 'success');
+            // console.log(vehicleID)
+            else
+              Swal.fire('Cancel', 'Cancel Deletion', 'info')
 
-      // var dateCurr = null;
-      // $('#confirm-create').click(function (event) {
-      //     event.preventDefault();
-      //     var dateInput = $('#addDate').val();
-      //     console.log(dateInput);
-      //     // Check if the dateInput is present in any of the Dates
-      //     var isDatePresent = firstData.Dates.some(function (dateObj) {
-      //         return dateObj.Date === dateInput;
-      //     });
-      //     if (isDatePresent) {
-      //         dateCurr = dateInput;
-      //         console.log(dateCurr);
-      //     } else {
-      //         console.log("Date not found in data.");
-      //     }
-      // });
+          }
+        });
+      } else {
+        console.log("vehicleID is undefined or empty");
+      }
+    }
+    function confirmDeletionDetails(){
+      return true
+      return false
+    }
+    function editDataDetails(){
+      var dataID =  $(this).attr('id')
+      if (dataID.includes('num') || dataID.includes('date'))
+        return ;
+      var orderID = getID(dataID)
+      console.log(orderID)
+      var currentData = $(this).text()
+      var inputElement = $('<input type="text" class="form-control">').val(currentData)
+      $(this).empty().append(inputElement);
+      inputElement.focus();
+      var beforeInput = currentData
+      console.log("before", beforeInput)
+      var originalElement = $(this);
+      inputElement.blur(function() {
+        var newData = $(this).val();
+        $(this).parent().text(newData);
+
+        if (newData !== currentData) {
+          Swal.fire({
+            title: 'Changes Confirmation',
+            text: 'Are you sure to save these changes?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Save',
+            cancelButtonText: 'Cancel'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              console.log("orderID, new Data: ", orderID, newData)
+              Swal.fire('Success', 'Changes saved', 'success');
+            } else {
+              // console.log("after", beforeInput)
+              originalElement.text(beforeInput)
+            }
+          });
+        }
+      });
+
+      $(`input`).on('keyup', function(event) {
+        if (event.keyCode === 13) {
+          $(this).blur();
+        }
+      });
+      // call api change data
     }
 
-  // Form Appear after click add button
+
+
+    // Form Appear after click add button
   $("#addData").on("click", function () {
     $("#formAdd").addClass("show");
     $("#dataTable").css({
